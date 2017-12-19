@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8" />
+	<title>Canvas - Casse-Briques</title>
+	<link href="https://fonts.googleapis.com/css?family=Bungee" rel="stylesheet">
+	<style>
+	:root {
+		--coton: #EDF2F4;
+		--cloud: #49CBD1;
+		--red:#FF5C58;
+		--jaune:#FFC858;
+	}
+	body{font-family: 'Bungee', cursive; background-color: var(--coton);}
+	h1, h2, h3{color:var(--red);}
+	canvas {
+		border: 1px solid var(--jaune);
+		background-color: #FFF;
+	}
+	input{
+		background-color: #FFF;
+		border: 1px solid var(--cloud);
+		color: var(--cloud);
+		font-size: 1.5em;
+	}
+	@media only screen and (max-width: 500px) {
+		.wrapper {
+			display: grid;
+			grid-template-columns: 100%;
+			grid-gap: 10px;
+		}
+	}
+	@media only screen and (min-width: 501px) {
+		.wrapper {
+			display: grid;
+			grid-template-columns: 49% 49%;
+			grid-gap: 10px;
+		}
+	}
+	.box {
+		border-radius: 5px;
+		text-align: center;
+	}
+	</style>
+	<script src="jquery-2.2.2.min.js"></script>
+	<script src="chronometre.js"></script>
+</head>
+<body>
+	<div class="wrapper">
+		<div class="box">
+			<h1>Canvas - Casse-Briques</h1>
+			<canvas id="mon_canvas" width="400" height="400">
+				Texte alternatif si la balise n'est pas supportée par le navigateur
+			</canvas>
+			<hr />
+			<input type="button" value="Démarrer le jeu" id="boutonDemarrage" />
+			<input type="button" value="Nouvelle partie" id="boutonNewGame"  />
+		</div>
+		<div class="box">
+			<h2>CHRONO : <span id="minutes"></span> minutes <span id="secondes"></span> secondes <span id="dixiemes"></span> dixièmes</h2>
+			<hr />
+			<h3>Meilleur Score</h3>
+			<p id="score"></p>
+		</div>
+	</div>
+		<script src="variables.js"></script>
+		<script src="init.js"></script>
+		<script src="evenements.js"></script>
+		<script src="dessin.js"></script>
+
+		<script type="text/javascript">
+
+		function convertirChronoVersScore(min, sec, dix) {
+			var score;
+			score = dix + (10*sec) + (min*60*10);
+			return score;
+		}
+
+		function sauvegarderScore() {
+			if (localStorage) {
+				/* le navigateur supporte le localStorage */
+				var nouveau_score;
+				var meilleur_score;
+
+				nouveau_score = convertirChronoVersScore(minutes,secondes,dixiemes);
+				meilleur_score = lireScore();
+				if (nouveau_score < meilleur_score) {
+					localStorage.setItem("Scores",nouveau_score);
+				}
+			}
+		}
+
+		function lireScore() {
+			var score;
+			score = localStorage.getItem("Scores");
+			return score;
+		}
+
+		function afficherScore() {
+			var score;
+
+			score = localStorage.getItem("Scores");
+
+			$("#score").html(score);
+		}
+
+		function nouvellePartie() {
+			effacer_ecran();
+			init();
+		}
+
+		function debutPartie() {
+
+			if (jeuDemarre==false) {
+				init_balle();
+				startChrono();
+				jeuDemarre = true;
+			}
+
+			/*document.getElementById("boutonDemarrage").style.visibility = "hidden";*/
+			$("#boutonDemarrage").css("visibility","hidden");
+			/*document.getElementById("boutonNewGame").style.visibility = "hidden";*/
+			$("#boutonNewGame").css("visibility","hidden");
+		}
+
+
+		/* si on clique sur le bouton "Nouvelle Partie", on redémarre une partie */
+		$("#boutonNewGame").click(nouvellePartie);
+		$("#boutonDemarrage").click(debutPartie);
+
+
+		function init() {
+			/*init_balle();*/
+			x=100;
+			y=100;
+			dx=4;
+			dy=8;
+
+			initMouse();
+			init_Briques();
+			effacer_ecran();
+			razChrono();
+
+			/*document.getElementById("boutonDemarrage").style.visibility = "visible";*/
+			$("#boutonDemarrage").css("visibility","visible");
+			/*document.getElementById("boutonNewGame").style.visibility = "hidden";*/
+			$("#boutonNewGame").css("visibility","hidden");
+
+			dessiner();
+
+			afficherScore();
+		}
+
+		function init_balle() {
+			/* redessiner la balle toutes les 30 millisecondes */
+			intervalID = setInterval(dessiner,30);
+		}
+
+		function effacer_ecran() {
+			/* Effacer l'écran avant de dessiner */
+			ctx.clearRect(0,0,largeur_canvas,hauteur_canvas);
+		}
+
+		function finPartie() {
+			stopChrono();
+			jeuDemarre = false;
+
+			effacer_ecran();
+
+			/*document.getElementById("boutonDemarrage").style.visibility = "hidden";*/
+			$("#boutonDemarrage").css("visibility","hidden");
+			/*document.getElementById("boutonNewGame").style.visibility = "visible";*/
+			$("#boutonNewGame").css("visibility","visible");
+		}
+
+		function gagne() {
+			finPartie();
+
+			ctx.font = "36px Bungee";
+			ctx.fillStyle = "#49CBD1";
+			ctx.textAlign = "center";
+
+			ctx.fillText("Bravo !", largeur_canvas/2, hauteur_canvas/2);
+
+			sonBravo.play();
+
+			sauvegarderScore();
+			afficherScore();
+		}
+
+		function perdu() {
+			finPartie();
+
+			ctx.font = "36px Bungee";
+			ctx.fillStyle = "#FF5C58";
+			ctx.textAlign = "center";
+
+			ctx.fillText("C'est perdu !", largeur_canvas/2, hauteur_canvas/2);
+
+			sonPerdu.play();
+		}
+
+		function positionPalette(x_balle, x_palette) {
+			var zonePalette;
+			/* je divise ma palette en 5 zones */
+			var zonePalette = largeur_palette / 5;
+
+			if ((x_balle > x_palette) && (x_balle < x_palette + zonePalette)) {
+				return "GAUCHE2";
+			} else if ((x_balle >= x_palette+zonePalette) && (x_balle < x_palette+zonePalette*2)) {
+				return "GAUCHE1";
+			} else if ((x_balle >= x_palette+zonePalette*2) && (x_balle < x_palette+zonePalette*3)) {
+				return "CENTRE";
+			} else if ((x_balle >= x_palette+zonePalette*3) && (x_balle < x_palette+zonePalette*4)) {
+				return "DROITE1";
+			} else if ((x_balle >= x_palette+zonePalette*4) && (x_balle < x_palette+zonePalette*5)) {
+				return "DROITE2";
+			}
+		}
+
+
+		window.onload = init;
+		</script>
+	</body>
+	</html>
